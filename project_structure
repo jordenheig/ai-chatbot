@@ -1,0 +1,41 @@
+rag-chatbot/
+├── docker/
+│   ├── Dockerfile.api
+│   ├── Dockerfile.worker
+│   └── docker-compose.yml
+├── app/
+│   ├── api/
+│   │   ├── __init__.py
+│   │   ├── main.py
+│   │   ├── auth.py
+│   │   ├── routes/
+│   │   │   ├── __init__.py
+│   │   │   ├── chat.py
+│   │   │   └── documents.py
+│   │   └── dependencies.py
+│   ├── worker/
+│   │   ├── __init__.py
+│   │   ├── main.py
+│   │   └── tasks.py
+│   ├── core/
+│   │   ├── __init__.py
+│   │   ├── config.py
+│   │   ├── security.py
+│   │   └── logging.py
+│   ├── db/
+│   │   ├── __init__.py
+│   │   ├── models.py
+│   │   └── repositories.py
+│   ├── services/
+│   │   ├── __init__.py
+│   │   ├── document_processor.py
+│   │   ├── embedding_service.py
+│   │   ├── llm_service.py
+│   │   └── vector_store.py
+│   └── templates/
+│       ├── base.html
+│       └── chat.html
+├── tests/
+│   └── __init__.py
+├── requirements.txt
+└── README.md 

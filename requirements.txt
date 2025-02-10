@@ -1,0 +1,16 @@
+fastapi
+uvicorn
+sqlalchemy
+pydantic
+pydantic-settings
+python-multipart
+celery
+redis
+any-parser
+sentence-transformers
+qdrant-client
+jinja2
+python-jose[cryptography]
+passlib[bcrypt]
+psycopg2-binary
+openai>=1.0.0 
