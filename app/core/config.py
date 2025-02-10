@@ -35,6 +35,9 @@ class Settings(BaseSettings):
         LOG_JSON_FORMAT: Whether to log in JSON format
         LOG_FILE_PATH: Path to the log file
         LOG_RETENTION_DAYS: Number of days to retain log files
+        VECTOR_DIMENSION: Dimension of embeddings
+        MAX_TOKENS: Maximum tokens for LLM
+        TEMPERATURE: Temperature for LLM
     """
     
     PROJECT_NAME: str = "RAG Chatbot"
@@ -62,8 +65,10 @@ class Settings(BaseSettings):
     REDIS_PORT: int = 6379
     
     # LLM settings
-    LLM_API_KEY: str = 'key'
+    LLM_API_KEY: str
     LLM_MODEL_NAME: str = "gpt-3.5-turbo"
+    MAX_TOKENS: int = 1000
+    TEMPERATURE: float = 0.7
     
     # Security settings
     SECRET_KEY: str = 'security-key'
@@ -75,6 +80,9 @@ class Settings(BaseSettings):
     LOG_JSON_FORMAT: bool = True
     LOG_FILE_PATH: str = "logs/app.log"
     LOG_RETENTION_DAYS: int = 30
+    
+    # Vector Store settings
+    VECTOR_DIMENSION: int = 768  # Dimension of embeddings
     
     class Config:
         """Pydantic configuration class."""

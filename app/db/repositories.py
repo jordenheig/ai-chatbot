@@ -20,16 +20,33 @@ class DocumentRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_document(self, document_id: int, user_id: int) -> Optional[Document]:
-        return self.db.query(Document).filter(
-            Document.id == document_id,
-            Document.owner_id == user_id
-        ).first()
+    def create_document(self, document: DocumentCreate, owner_id: int) -> Document:
+        db_document = Document(
+            **document.dict(),
+            owner_id=owner_id
+        )
+        self.db.add(db_document)
+        self.db.commit()
+        self.db.refresh(db_document)
+        return db_document
 
-    def get_user_documents(self, user_id: int) -> List[Document]:
-        return self.db.query(Document).filter(
-            Document.owner_id == user_id
-        ).all()
+    def get_document(self, document_id: int, owner_id: int) -> Optional[Document]:
+        return (
+            self.db.query(Document)
+            .filter(
+                Document.id == document_id,
+                Document.owner_id == owner_id
+            )
+            .first()
+        )
+
+    def get_user_documents(self, owner_id: int) -> List[Document]:
+        return (
+            self.db.query(Document)
+            .filter(Document.owner_id == owner_id)
+            .order_by(Document.created_at.desc())
+            .all()
+        )
 
 class ChatRepository:
     def __init__(self, db: Session):

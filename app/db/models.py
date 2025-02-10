@@ -48,27 +48,23 @@ class User(Base):
     chat_sessions = relationship("ChatSession", back_populates="user")
 
 class Document(Base):
-    """Document model for storing uploaded files.
+    """Document model for storing uploaded file metadata."""
     
-    Attributes:
-        id: Unique identifier
-        filename: Original filename
-        content_type: MIME type of the document
-        status: Current processing status
-        owner_id: ID of the user who uploaded the document
-        owner: Reference to the user who owns the document
-        created_at: Timestamp of document creation
-    """
     __tablename__ = "documents"
     
     id = Column(Integer, primary_key=True, index=True)
-    filename = Column(String)
-    content_type = Column(String)
-    status = Column(Enum(ProcessingStatus))
-    owner_id = Column(Integer, ForeignKey("users.id"))
+    filename = Column(String, nullable=False)  # Original filename
+    safe_name = Column(String, nullable=False)  # Sanitized filename for storage
+    content_type = Column(String)  # MIME type
+    file_size = Column(Integer, nullable=False)  # Size in bytes
+    status = Column(Enum(ProcessingStatus), default=ProcessingStatus.PENDING)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    owner_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     
+    # Relationships
     owner = relationship("User", back_populates="documents")
+    chunks = relationship("DocumentChunk", back_populates="document", cascade="all, delete-orphan")
 
 class ChatSession(Base):
     """Chat session model for organizing conversations.
