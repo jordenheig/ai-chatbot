@@ -82,8 +82,8 @@ sequenceDiagram
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/rag-chatbot.git
-cd rag-chatbot
+git clone https://github.com/jordenheig/ai-chatbot
+cd ai-chatbot
 ```
 
 2. Start with Docker (recommended):
