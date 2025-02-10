@@ -1,13 +1,15 @@
 """Celery worker configuration for background tasks.
 
-This module configures Celery for handling background tasks such as:
-- Document processing and OCR
-- Vector index management
+This module configures Celery for handling:
+- Document processing tasks
+- Vector store maintenance
 - Periodic cleanup tasks
+- Task routing and scheduling
 """
 
 from celery import Celery
 from app.core.config import settings
+from app.core.logging import logger
 
 celery_app = Celery(
     "worker",
@@ -19,7 +21,7 @@ celery_app = Celery(
     ]
 )
 
-# Configure Celery
+# Configure Celery settings
 celery_app.conf.update(
     task_serializer="json",
     accept_content=["json"],
@@ -35,14 +37,33 @@ celery_app.conf.update(
     }
 )
 
-# Optional: Configure periodic tasks
+# Configure periodic tasks
 celery_app.conf.beat_schedule = {
     "cleanup-old-documents": {
         "task": "app.services.document_processor.cleanup_old_documents",
         "schedule": 86400.0,  # 24 hours
+        "options": {"queue": "document_processing"}
     },
     "optimize-vector-index": {
         "task": "app.services.vector_store.optimize_index",
         "schedule": 43200.0,  # 12 hours
+        "options": {"queue": "vector_store"}
     }
-} 
+}
+
+@celery_app.task(bind=True)
+def test_task(self):
+    """Test task to verify Celery configuration.
+    
+    Returns:
+        Dict containing task status and worker info
+    """
+    try:
+        return {
+            "status": "success",
+            "message": "Celery worker is functioning correctly",
+            "worker_id": self.request.id
+        }
+    except Exception as e:
+        logger.error(f"Test task failed: {str(e)}")
+        raise 

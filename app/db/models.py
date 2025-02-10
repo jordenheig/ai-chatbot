@@ -48,8 +48,19 @@ class User(Base):
     chat_sessions = relationship("ChatSession", back_populates="user")
 
 class Document(Base):
-    """Document model for storing uploaded file metadata."""
+    """Document model for storing uploaded file metadata.
     
+    Attributes:
+        id: Unique identifier
+        filename: Original filename
+        safe_name: Sanitized filename for storage
+        content_type: MIME type
+        file_size: Size in bytes
+        status: Current processing status
+        created_at: Upload timestamp
+        updated_at: Last update timestamp
+        owner_id: Reference to user who uploaded
+    """
     __tablename__ = "documents"
     
     id = Column(Integer, primary_key=True, index=True)

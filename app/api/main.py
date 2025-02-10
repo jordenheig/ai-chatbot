@@ -1,3 +1,14 @@
+"""FastAPI application entry point for the RAG Chatbot.
+
+This module initializes and configures the FastAPI application with:
+- API routes and endpoints
+- Middleware configuration
+- Static file serving
+- WebSocket handling
+- CORS settings
+- Application events
+"""
+
 from fastapi import FastAPI, WebSocket
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -17,7 +28,7 @@ app = FastAPI(
     openapi_url=f"{settings.API_V1_STR}/openapi.json"
 )
 
-# CORS middleware
+# Configure CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -26,13 +37,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount static files
-app.mount("/static", StaticFiles(directory="app/static"), name="static")
+# Add request logging middleware
+app.add_middleware(RequestLoggingMiddleware)
 
-# Templates
+# Mount static files and templates
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates")
 
-# Include routers
+# Include API routers
 app.include_router(
     chat.router,
     prefix=f"{settings.API_V1_STR}/chat",
@@ -43,9 +55,6 @@ app.include_router(
     prefix=f"{settings.API_V1_STR}/documents",
     tags=["documents"]
 )
-
-# Add middleware
-app.add_middleware(RequestLoggingMiddleware)
 
 class ConnectionManager:
     """Manages WebSocket connections for real-time updates."""
@@ -95,8 +104,10 @@ async def websocket_endpoint(websocket: WebSocket, user = Depends(get_current_us
 
 @app.on_event("startup")
 async def startup_event():
+    """Execute startup tasks when application starts."""
     logger.info("Application starting up")
 
 @app.on_event("shutdown")
 async def shutdown_event():
+    """Execute cleanup tasks when application shuts down."""
     logger.info("Application shutting down") 

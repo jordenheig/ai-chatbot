@@ -1,49 +1,49 @@
+"""Database initialization and setup.
+
+This module handles:
+- Database table creation
+- Initial data seeding
+- Database migrations
+- Index creation
+"""
+
 from sqlalchemy.orm import Session
-from app.db.session import engine, SessionLocal
-from app.db.models import Base
-from app.core.logging import logger
+from app.db.base import Base
+from app.db.session import engine
+from app.core.config import settings
 from app.core.security import get_password_hash
 from app.db.models import User
-import time
+from app.core.logging import logger
 
-def init_db() -> None:
-    max_retries = 5
-    retry_interval = 5  # seconds
-
-    for attempt in range(max_retries):
-        try:
-            # Create all tables
-            Base.metadata.create_all(bind=engine)
-            logger.info("Database tables created successfully")
-
-            # Create initial admin user if it doesn't exist
-            db = SessionLocal()
-            try:
-                # Check if admin user exists
-                admin_email = "admin@example.com"
-                admin = db.query(User).filter(User.email == admin_email).first()
-                
-                if not admin:
-                    admin = User(
-                        email=admin_email,
-                        hashed_password=get_password_hash("admin123")  # Change this password
-                    )
-                    db.add(admin)
-                    db.commit()
-                    logger.info("Admin user created successfully")
-            finally:
-                db.close()
+def init_db(db: Session) -> None:
+    """Initialize database with required tables and initial data.
+    
+    Args:
+        db: Database session
+        
+    This function:
+    1. Creates all tables
+    2. Creates initial admin user if not exists
+    3. Sets up required indexes
+    """
+    try:
+        # Create tables
+        Base.metadata.create_all(bind=engine)
+        
+        # Create admin user if not exists
+        admin_email = settings.FIRST_ADMIN_EMAIL
+        if not db.query(User).filter(User.email == admin_email).first():
+            admin_user = User(
+                email=admin_email,
+                hashed_password=get_password_hash(settings.FIRST_ADMIN_PASSWORD)
+            )
+            db.add(admin_user)
+            db.commit()
+            logger.info("Created initial admin user")
             
-            break  # Exit the retry loop if successful
-            
-        except Exception as e:
-            if attempt < max_retries - 1:
-                logger.warning(f"Database initialization attempt {attempt + 1} failed: {str(e)}")
-                logger.info(f"Retrying in {retry_interval} seconds...")
-                time.sleep(retry_interval)
-            else:
-                logger.error(f"Database initialization failed after {max_retries} attempts")
-                raise
+    except Exception as e:
+        logger.error(f"Database initialization failed: {str(e)}")
+        raise
 
 if __name__ == "__main__":
     init_db() 

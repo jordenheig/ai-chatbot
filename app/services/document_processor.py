@@ -1,13 +1,11 @@
 """Document processing service for the RAG Chatbot.
 
-This module handles the processing of uploaded documents, including:
-- Text extraction from various document formats
-- Image extraction and OCR processing from PDFs
-- Text chunking for vector storage
-- Document status management
-
-The module uses AnyParser for basic text extraction and EasyOCR for
-image text extraction, maintaining the proper order of text in the document.
+This module handles:
+- Document text extraction
+- OCR processing for images
+- Text chunking and embedding
+- Vector store integration
+- Processing status management
 """
 
 from typing import BinaryIO, List, Dict, Tuple
@@ -27,49 +25,87 @@ from app.api.connection_manager import ConnectionManager
 from datetime import datetime, timedelta
 
 class DocumentProcessor:
-    """Handles document processing and text extraction.
+    """Handles document processing pipeline.
     
-    This class manages the entire document processing pipeline, including
-    text extraction, OCR, and chunking for vector storage.
+    This class manages:
+    - Text extraction from various formats
+    - OCR for images and scanned documents
+    - Text chunking for vector storage
+    - Processing status updates
     """
-
+    
     def __init__(self):
-        """Initialize the document processor with required components."""
+        """Initialize document processor with required components."""
         self.parser = AnyParser()
         # Initialize EasyOCR reader (only initialize once for performance)
         self.ocr_reader = easyocr.Reader(['en'])
+        self.chunk_size = 1000
+        self.chunk_overlap = 200
     
-    async def process_document(self, file_content: bytes, filename: str) -> List[str]:
-        """Process a document and return chunks of text.
+    async def process_document(self, document_id: int, content: bytes) -> None:
+        """Process a document through the complete pipeline.
         
         Args:
-            file_content: Raw bytes of the document
-            filename: Name of the uploaded file
-        
-        Returns:
-            List of text chunks ready for embedding
-        
+            document_id: ID of document to process
+            content: Raw document content
+            
         Raises:
-            Exception: If document processing fails
+            ProcessingError: If document processing fails
         """
         try:
             # Parse document using AnyParser
-            parsed_content = self.parser.parse(file_content, filename)
+            parsed_content = self.parser.parse(content, document.filename)
             text_content = parsed_content.text
             
             # Special handling for PDFs with images
-            if filename.lower().endswith('.pdf'):
+            if document.filename.lower().endswith('.pdf'):
                 text_by_page = self._split_text_by_pages(text_content)
-                ocr_by_page = await self._process_pdf_images(file_content)
+                ocr_by_page = await self._process_pdf_images(content)
                 merged_text = self._merge_text_and_ocr(text_by_page, ocr_by_page)
                 text_content = merged_text
             
             chunks = self._split_into_chunks(text_content)
-            return chunks
             
+            # Generate embeddings for chunks
+            embeddings = await generate_embeddings(chunks)
+            
+            # Store chunks and embeddings in vector store
+            await store_document_chunks(
+                document_id=document_id,
+                chunks=chunks,
+                embeddings=embeddings
+            )
+            
+            # Update document status to completed
+            document.status = ProcessingStatus.COMPLETED
+            db.commit()
+            
+            # Send real-time update
+            await manager.send_document_update(
+                document.owner_id,
+                document_id,
+                ProcessingStatus.COMPLETED.value
+            )
+            
+            logger.info(
+                "Document processing completed",
+                extra={
+                    'document_id': document_id,
+                    'chunks_count': len(chunks),
+                    'embeddings_count': len(embeddings)
+                }
+            )
         except Exception as e:
-            logger.error(f"Error processing document {filename}: {str(e)}")
-            raise
+            logger.error(
+                "Document processing failed",
+                extra={
+                    'document_id': document_id,
+                    'error': str(e)
+                },
+                exc_info=True
+            )
+        finally:
+            db.close()
 
     def _split_text_by_pages(self, text: str) -> Dict[int, str]:
         """Split document text into pages based on page markers.
@@ -205,13 +241,11 @@ class DocumentProcessor:
         # Join all pages with page separators
         return "\n\n=== Page Break ===\n\n".join(merged_pages)
     
-    def _split_into_chunks(self, text: str, chunk_size: int = 1000, overlap: int = 100) -> List[str]:
-        """Split text into overlapping chunks for vector storage.
+    def _split_into_chunks(self, text: str) -> List[str]:
+        """Split text into chunks for vector storage.
         
         Args:
             text: Text to split
-            chunk_size: Maximum size of each chunk
-            overlap: Number of characters to overlap between chunks
             
         Returns:
             List of text chunks
@@ -221,7 +255,7 @@ class DocumentProcessor:
         text_length = len(text)
         
         while start < text_length:
-            end = start + chunk_size
+            end = start + self.chunk_size
             
             # Adjust chunk end to not split words
             if end < text_length:
@@ -232,8 +266,8 @@ class DocumentProcessor:
             # Add chunk
             chunks.append(text[start:end].strip())
             
-            # Move start position for next chunk, considering overlap
-            start = end - overlap
+            # Move start position for next chunk
+            start = end - self.chunk_overlap
         
         return chunks
 
@@ -285,30 +319,9 @@ async def process_document_task(self, document_id: int, file_content: bytes):
         )
         
         # Process document
-        chunks = await process_document.processor.process_document(
-            file_content,
-            document.filename
-        )
-        
-        # Generate embeddings for chunks
-        embeddings = await generate_embeddings(chunks)
-        
-        # Store chunks and embeddings in vector store
-        await store_document_chunks(
-            document_id=document_id,
-            chunks=chunks,
-            embeddings=embeddings
-        )
-        
-        # Update document status to completed
-        document.status = ProcessingStatus.COMPLETED
-        db.commit()
-        
-        # Send real-time update
-        await manager.send_document_update(
-            document.owner_id,
+        await process_document.processor.process_document(
             document_id,
-            ProcessingStatus.COMPLETED.value
+            file_content
         )
         
         logger.info(

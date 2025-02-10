@@ -13,6 +13,15 @@ from fastapi import WebSocketDisconnect
 
 router = APIRouter()
 
+"""Chat endpoints for the RAG Chatbot.
+
+This module handles:
+- Chat session management
+- Message processing
+- WebSocket connections
+- RAG-powered responses
+"""
+
 @router.post("/sessions")
 async def create_chat_session(
     current_user = Depends(get_current_user),
@@ -68,17 +77,35 @@ async def chat_websocket(
     current_user = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    """Handle WebSocket connection for chat session.
+    
+    Args:
+        websocket: WebSocket connection
+        session_id: Chat session ID
+        current_user: Authenticated user
+        db: Database session
+        
+    Flow:
+        1. Accept WebSocket connection
+        2. Load chat session and history
+        3. Process incoming messages
+        4. Generate and stream responses
+        5. Store messages in database
+        
+    The WebSocket enables:
+        - Real-time message streaming
+        - Stateful chat sessions
+        - Error handling and recovery
+    """
     await websocket.accept()
     
     try:
-        # Get chat session
         chat_repo = ChatRepository(db)
         session = chat_repo.get_session(session_id, current_user.id)
         if not session:
             await websocket.close(code=4004)
             return
         
-        # Get chat history
         history = chat_repo.get_session_messages(session_id)
         history_formatted = [
             {"role": msg.role, "content": msg.content}
@@ -86,7 +113,6 @@ async def chat_websocket(
         ]
         
         while True:
-            # Receive message
             message = await websocket.receive_text()
             
             # Store user message
@@ -99,19 +125,19 @@ async def chat_websocket(
             db.commit()
             
             try:
-                # Generate response using RAG
+                # Generate RAG response
                 response_stream = await rag_service.generate_response(
                     query=message,
                     chat_history=history_formatted
                 )
                 
-                # Stream response
+                # Stream response chunks
                 full_response = []
                 async for chunk in rag_service.process_stream(response_stream):
                     await websocket.send_text(chunk)
                     full_response.append(chunk)
                 
-                # Store assistant response
+                # Store complete response
                 chat_message = ChatMessage(
                     session_id=session_id,
                     role="assistant",
@@ -120,17 +146,26 @@ async def chat_websocket(
                 db.add(chat_message)
                 db.commit()
                 
-                # Update history
+                # Update chat history
                 history_formatted.extend([
                     {"role": "user", "content": message},
                     {"role": "assistant", "content": "".join(full_response)}
                 ])
                 
             except Exception as e:
-                logger.error(f"Error generating response: {str(e)}")
+                logger.error(
+                    "Chat response error",
+                    extra={
+                        "session_id": session_id,
+                        "error": str(e)
+                    }
+                )
                 await websocket.send_text(
                     "I apologize, but I encountered an error processing your request."
                 )
                 
     except WebSocketDisconnect:
-        logger.info(f"WebSocket disconnected for session {session_id}") 
+        logger.info(
+            "WebSocket disconnected",
+            extra={"session_id": session_id}
+        ) 
