@@ -1,3 +1,5 @@
+Author: 何宏健
+
 # RAG Chatbot
 
 A Retrieval-Augmented Generation (RAG) chatbot that allows users to upload documents and chat with an AI that understands their content. Built with FastAPI, Celery, and React.
