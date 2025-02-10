@@ -12,6 +12,10 @@ from sentence_transformers import SentenceTransformer
 from app.core.config import settings
 from app.core.logging import logger
 
+class EmbeddingError(Exception):
+    """Exception raised for errors during embedding generation."""
+    pass
+
 class EmbeddingService:
     """Service for generating text embeddings.
     
@@ -45,7 +49,7 @@ class EmbeddingService:
             return embeddings.tolist()
         except Exception as e:
             logger.error(f"Error generating embeddings: {str(e)}")
-            raise
+            raise EmbeddingError(f"Failed to generate embeddings: {str(e)}") from e
 
 # Create singleton instance
 embedding_service = EmbeddingService()

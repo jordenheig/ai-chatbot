@@ -23,6 +23,7 @@ from PIL import Image
 import numpy as np
 from app.api.connection_manager import ConnectionManager
 from datetime import datetime, timedelta
+from app.db.session import SessionLocal
 
 class DocumentProcessor:
     """Handles document processing pipeline.
@@ -42,50 +43,54 @@ class DocumentProcessor:
         self.chunk_size = 1000
         self.chunk_overlap = 200
     
-    async def process_document(self, document_id: int, content: bytes) -> None:
+    async def process_document(
+        self,
+        document_id: int,
+        file_content: bytes,
+        db: Session
+    ) -> None:
         """Process a document through the complete pipeline.
         
         Args:
             document_id: ID of document to process
-            content: Raw document content
+            file_content: Raw document content
+            db: Database session
             
         Raises:
             ProcessingError: If document processing fails
         """
         try:
+            # Get document from database
+            document = db.query(Document).filter(Document.id == document_id).first()
+            if not document:
+                raise ValueError(f"Document {document_id} not found")
+
             # Parse document using AnyParser
-            parsed_content = self.parser.parse(content, document.filename)
+            parsed_content = self.parser.parse(file_content, document.filename)
             text_content = parsed_content.text
             
             # Special handling for PDFs with images
             if document.filename.lower().endswith('.pdf'):
                 text_by_page = self._split_text_by_pages(text_content)
-                ocr_by_page = await self._process_pdf_images(content)
-                merged_text = self._merge_text_and_ocr(text_by_page, ocr_by_page)
-                text_content = merged_text
+                ocr_by_page = await self._process_pdf_images(file_content)
+                text_content = self._merge_text_and_ocr(text_by_page, ocr_by_page)
             
+            # Generate chunks
             chunks = self._split_into_chunks(text_content)
             
-            # Generate embeddings for chunks
+            # Generate embeddings
             embeddings = await generate_embeddings(chunks)
             
-            # Store chunks and embeddings in vector store
+            # Store in vector store
             await store_document_chunks(
                 document_id=document_id,
                 chunks=chunks,
                 embeddings=embeddings
             )
             
-            # Update document status to completed
+            # Update document status
             document.status = ProcessingStatus.COMPLETED
             db.commit()
-            
-            # Send real-time update
-            await manager.send_document_update(
-                document.owner_id,
-                document_id,
-                ProcessingStatus.COMPLETED.value
-            )
             
             logger.info(
                 "Document processing completed",
@@ -95,6 +100,7 @@ class DocumentProcessor:
                     'embeddings_count': len(embeddings)
                 }
             )
+            
         except Exception as e:
             logger.error(
                 "Document processing failed",
@@ -104,8 +110,11 @@ class DocumentProcessor:
                 },
                 exc_info=True
             )
-        finally:
-            db.close()
+            # Update document status to failed
+            if document:
+                document.status = ProcessingStatus.FAILED
+                db.commit()
+            raise
 
     def _split_text_by_pages(self, text: str) -> Dict[int, str]:
         """Split document text into pages based on page markers.
@@ -289,17 +298,16 @@ class DocumentProcessingTask(Task):
     retry_jitter=True
 )
 async def process_document_task(self, document_id: int, file_content: bytes):
-    """Celery task to process documents asynchronously with retries."""
+    """Celery task to process documents asynchronously with retries.
+    
+    Args:
+        document_id: ID of document to process
+        file_content: Raw document content
+        
+    Note:
+        Includes automatic retries with exponential backoff
+    """
     try:
-        logger.info(
-            "Starting document processing",
-            extra={
-                'document_id': document_id,
-                'filename': document.filename,
-                'content_type': document.content_type
-            }
-        )
-        # Get document from database
         db = SessionLocal()
         document = db.query(Document).filter(Document.id == document_id).first()
         
@@ -311,27 +319,19 @@ async def process_document_task(self, document_id: int, file_content: bytes):
         document.status = ProcessingStatus.PROCESSING
         db.commit()
         
-        # Send real-time update
-        await manager.send_document_update(
-            document.owner_id, 
-            document_id, 
-            ProcessingStatus.PROCESSING.value
+        logger.info(
+            "Starting document processing",
+            extra={
+                'document_id': document_id,
+                'filename': document.filename,
+                'content_type': document.content_type
+            }
         )
         
         # Process document
-        await process_document.processor.process_document(
-            document_id,
-            file_content
-        )
+        processor = DocumentProcessor()
+        await processor.process_document(document_id, file_content, db)
         
-        logger.info(
-            "Document processing completed",
-            extra={
-                'document_id': document_id,
-                'chunks_count': len(chunks),
-                'embeddings_count': len(embeddings)
-            }
-        )
     except Exception as e:
         logger.error(
             "Document processing failed",
@@ -342,8 +342,18 @@ async def process_document_task(self, document_id: int, file_content: bytes):
             },
             exc_info=True
         )
+        
+        if document:
+            document.status = ProcessingStatus.FAILED
+            db.commit()
+            
+        # Retry with exponential backoff
+        if self.request.retries < self.max_retries:
+            raise self.retry(exc=e)
+        raise
+        
     finally:
-        db.close() 
+        db.close()
 
 @celery_app.task
 async def cleanup_old_documents():

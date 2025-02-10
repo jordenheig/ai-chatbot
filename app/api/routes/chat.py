@@ -1,15 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException, WebSocket
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 from typing import List
 from app.db.models import ChatSession, ChatMessage
 from app.core.security import get_current_user
-from app.services.llm_service import generate_response
-from app.services.vector_store import search_relevant_docs
+from app.services.llm_service import generate_chat_response
+from app.services.vector_store import vector_store
 from fastapi.responses import StreamingResponse
 from app.api.dependencies import get_db
 from app.services.rag_service import rag_service
 from app.db.repositories import ChatRepository
-from fastapi import WebSocketDisconnect
+from app.core.logging import logger
 
 router = APIRouter()
 
@@ -61,11 +61,11 @@ async def send_message(
     db.commit()
     
     # Search relevant documents
-    relevant_docs = await search_relevant_docs(message)
+    relevant_docs = await vector_store.search_relevant_docs(message)
     
     # Generate streaming response
     async def response_stream():
-        async for token in generate_response(message, relevant_docs):
+        async for token in generate_chat_response(message, relevant_docs):
             yield token
     
     return StreamingResponse(response_stream())
