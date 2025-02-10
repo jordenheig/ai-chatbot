@@ -13,49 +13,38 @@ A Retrieval-Augmented Generation (RAG) chatbot that allows users to upload docum
   - Delete/manage uploaded documents
 
 - 💬 **Chat Interface**
-  - Interactive chat with context from uploaded documents
   - Chat session management
   - Complete chat history in left sidebar
   - Start new chat sessions
   - Continue existing conversations
 
-- 🔄 **Real-time Updates**
-  - Document processing status
-  - Chat message streaming
-  - Session synchronization
 
 ## Tech Stack
 
 - **Backend**: FastAPI, Python 3.9+
-- **Frontend**: React, TailwindCSS
+- **Frontend**: TailwindCSS
 - **Database**: PostgreSQL
 - **Vector Store**: Qdrant
 - **Message Queue**: Redis, Celery
-- **Document Processing**: PyMuPDF, EasyOCR
+- **Document Processing**: PyMuPDF, EasyOCR, AnyParser
 - **Containerization**: Docker
 
 ## Project Structure
 
 ```
 rag-chatbot/
-├── backend/                 # FastAPI backend application
+├── frontend-backend/                 # FastAPI full-stack application
 │   ├── app/
-│   │   ├── api/            # API routes and endpoints
+    │   │   ├── api/            # API routes and endpoints
 │   │   │   ├── core/           # Core configuration
-│   │   │   ├── models/         # Database models
+│   │   │   ├── crud/           # Crud operation
+│   │   │   ├── db/             # Database definition and models
 │   │   │   ├── schemas/        # Pydantic schemas
+│   │   │   ├── worker/         # Background task worker
+│   │   │   ├── static/         # Javascript code
+│   │   │   ├── templates/      # Jinja2 frontend template
 │   │   │   └── services/       # Business logic
-│   │   ├── celery_worker/      # Celery tasks for async processing
-│   │   └── tests/              # Backend tests
-│   ├── frontend/               # React frontend application
-│   │   ├── src/
-│   │   │   ├── components/     # React components
-│   │   │   ├── contexts/       # React contexts
-│   │   │   ├── hooks/         # Custom hooks
-│   │   │   ├── pages/         # Page components
-│   │   │   └── services/      # API services
-│   │   └── public/            # Static files
-│   └── docker/                # Docker configuration files
+│   └── docker/                 # Docker configuration files
 ```
 
 ```mermaid
@@ -97,75 +86,17 @@ git clone https://github.com/yourusername/rag-chatbot.git
 cd rag-chatbot
 ```
 
-2. Set up environment variables:
+2. Start with Docker (recommended):
 ```bash
-cp backend/.env.example backend/.env
-cp frontend/.env.example frontend/.env
+bash run.sh
 ```
 
-3. Start with Docker (recommended):
-```bash
-docker-compose up --build
-```
 
-4. Or run services individually:
 
-Backend:
-```bash
-cd backend
-python -m venv venv
-source venv/bin/activate  # On Windows: .\venv\Scripts\activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload
-```
+## Special note
 
-Frontend:
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Celery Worker:
-```bash
-cd backend
-celery -A celery_worker.celery worker --loglevel=info
-```
-
-## Component Details
-
-### Backend Components
-- **api/**: Contains all API routes and endpoint definitions
-- **core/**: Configuration settings, database setup, and security
-- **models/**: SQLAlchemy database models
-- **schemas/**: Pydantic models for request/response validation
-- **services/**: Business logic implementation
-
-### Frontend Components
-- **components/**: Reusable UI components
-- **contexts/**: React context providers for state management
-- **hooks/**: Custom React hooks
-- **pages/**: Main page components
-- **services/**: API integration services
-
-### Infrastructure
-- **docker/**: Contains Dockerfile and docker-compose configuration
-- **celery_worker/**: Async task processing for document handling
-
-## Access Points
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:8000
-- API Documentation: http://localhost:8000/docs
-- Qdrant Dashboard: http://localhost:6333/dashboard
-
-## Development
-
-To run tests:
-```bash
-cd backend
-pytest
-```
-
+Due to network reason, the code in this repository is only tested up to downloading the huggingface model. A proper resolution of this
+network issue requires a complete dig-in of the configuration of my current network setup, for which i just leave since there's limited time for this work.
 
 
 

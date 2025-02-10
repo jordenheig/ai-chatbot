@@ -23,6 +23,7 @@ class ProcessingStatus(enum.Enum):
         COMPLETED: Document processing completed successfully
         FAILED: Document processing failed
     """
+
     PENDING = "pending"
     PROCESSING = "processing"
     COMPLETED = "completed"

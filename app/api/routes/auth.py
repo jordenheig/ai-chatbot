@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from datetime import timedelta
 from typing import Any, Dict
 
+
 from app.core.security import (
     verify_password,
     create_access_token,
@@ -23,7 +24,7 @@ from app.core.security import (
 from app.core.config import settings
 from app.db.repositories import UserRepository
 from app.schemas.user import UserCreate, User, UserLogin, Token
-from app.api.dependencies import get_db
+from app.api.dependencies import get_db, get_current_user
 from app.core.logging import logger
 
 router = APIRouter()

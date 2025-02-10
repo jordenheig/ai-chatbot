@@ -13,7 +13,7 @@ from fastapi import FastAPI, WebSocket
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from app.core.config import settings
-from app.api.routes import chat, documents
+from app.api.routes import chat, documents, auth
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.requests import Request
 from fastapi.websockets import WebSocketDisconnect
@@ -55,6 +55,11 @@ app.include_router(
     prefix=f"{settings.API_V1_STR}/documents",
     tags=["documents"]
 )
+app.include_router(
+    auth.router,
+    prefix=f"{settings.API_V1_STR}/auth",
+    tags=["auth"]
+)
 
 class ConnectionManager:
     """Manages WebSocket connections for real-time updates."""
@@ -92,15 +97,6 @@ manager = ConnectionManager()
 async def root(request: Request):
     return templates.TemplateResponse("chat.html", {"request": request})
 
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket, user = Depends(get_current_user)):
-    await manager.connect(websocket, user.id)
-    try:
-        while True:
-            # Keep connection alive
-            await websocket.receive_text()
-    except WebSocketDisconnect:
-        manager.disconnect(websocket, user.id)
 
 @app.on_event("startup")
 async def startup_event():
