@@ -10,6 +10,7 @@ class ChatInterface {
         this.messageForm = document.getElementById('messageForm');
         this.uploadForm = document.getElementById('uploadForm');
         this.newChatButton = document.getElementById('newChat');
+        this.documentList = document.getElementById('documentList');
 
         // Bind event listeners
         this.messageForm.addEventListener('submit', this.handleMessageSubmit.bind(this));
@@ -18,6 +19,10 @@ class ChatInterface {
 
         // Load initial chat sessions
         this.loadChatSessions();
+        this.loadDocuments();
+
+        // Initialize SSE connection for status updates
+        this.initializeStatusStream();
     }
 
     async loadChatSessions() {
@@ -172,6 +177,75 @@ class ChatInterface {
         } else {
             this.addMessage('assistant', content);
         }
+    }
+
+    async loadDocuments() {
+        try {
+            const response = await fetch('/api/v1/documents');
+            const documents = await response.json();
+            this.renderDocumentList(documents);
+        } catch (error) {
+            console.error('Error loading documents:', error);
+        }
+    }
+
+    renderDocumentList(documents) {
+        this.documentList.innerHTML = documents.map(doc => `
+            <div class="p-2 border-b flex justify-between items-center" data-document-id="${doc.id}">
+                <div>
+                    <span class="font-medium">${doc.filename}</span>
+                    <span class="text-sm text-gray-500 ml-2 status">${doc.status}</span>
+                </div>
+                <div>
+                    <button onclick="chat.deleteDocument(${doc.id})" 
+                            class="text-red-600 ${doc.status === 'processing' ? 'opacity-50' : ''}"
+                            ${doc.status === 'processing' ? 'disabled' : ''}>
+                        Delete
+                    </button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    async deleteDocument(docId) {
+        try {
+            await fetch(`/api/v1/documents/${docId}`, { method: 'DELETE' });
+            this.loadDocuments();
+        } catch (error) {
+            console.error('Error deleting document:', error);
+        }
+    }
+
+    initializeStatusStream() {
+        const eventSource = new EventSource('/api/v1/documents/status-stream');
+        
+        eventSource.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            this.updateDocumentStatuses(data.data);
+        };
+        
+        eventSource.onerror = (error) => {
+            console.error('SSE Error:', error);
+            // Reconnect after a delay
+            setTimeout(() => this.initializeStatusStream(), 1000);
+            eventSource.close();
+        };
+    }
+    
+    updateDocumentStatuses(documents) {
+        documents.forEach(doc => {
+            const statusElement = document.querySelector(`[data-document-id="${doc.id}"] .status`);
+            if (statusElement) {
+                statusElement.textContent = doc.status;
+                
+                // Update delete button state
+                const deleteButton = document.querySelector(`[data-document-id="${doc.id}"] button`);
+                if (deleteButton) {
+                    deleteButton.disabled = doc.status === 'processing';
+                    deleteButton.classList.toggle('opacity-50', doc.status === 'processing');
+                }
+            }
+        });
     }
 }
 

@@ -13,4 +13,11 @@ jinja2
 python-jose[cryptography]
 passlib[bcrypt]
 psycopg2-binary
-openai>=1.0.0 
+openai>=1.0.0
+PyMuPDF
+easyocr
+numpy
+Pillow
+sse-starlette
+python-json-logger
+structlog 

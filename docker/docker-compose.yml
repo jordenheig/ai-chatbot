@@ -31,6 +31,7 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile.worker
+    command: celery -A app.worker.main worker -Q document_processing,vector_store --loglevel=info
     environment:
       - POSTGRES_SERVER=db
       - POSTGRES_USER=postgres
@@ -47,6 +48,17 @@ services:
         condition: service_started
       qdrant:
         condition: service_started
+
+  celery-beat:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.worker
+    command: celery -A app.worker.main beat --loglevel=info
+    environment:
+      - REDIS_HOST=redis
+    depends_on:
+      - redis
+      - worker
 
   db:
     image: postgres:13
