@@ -85,6 +85,7 @@ sequenceDiagram
     L->>A: Return Response
     A->>P: Store Chat History
     A->>C: Stream Response
+```
 
 ## Setup and Installation
 
